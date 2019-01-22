@@ -329,16 +329,16 @@ class Kassacompleetideal extends NonmerchantGateway
             case 'processing':
                 return 'pending';
             case 'completed':
-                $status = 'approved';
+                return 'approved';
             case 'cancelled':
-                $status = 'void';
+                return 'void';
             case 'expired':
-                $status = 'error';
+                return 'error';
             case 'see-transactions':
-                $status = 'see_transactions';
+                return 'see_transactions';
             case 'error':
             default:
-                $status = 'declined';
+                return'declined';
         }
     }
 
