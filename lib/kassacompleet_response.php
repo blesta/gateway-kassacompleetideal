@@ -5,7 +5,6 @@ class KassacompleetResponse
     private $raw;
     private $response;
     private $errors;
-    private $status;
 
     /**
      * KassacompleetResponse constructor.
@@ -20,7 +19,6 @@ class KassacompleetResponse
 
         if (isset($this->response->error)) {
             $this->errors = isset($this->response->error->value) ? $this->response->error->value : '';
-            $this->status = isset($this->response->error->status) ? $this->response->error->status : 400;
         }
     }
 

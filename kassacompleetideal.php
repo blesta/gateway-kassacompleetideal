@@ -60,6 +60,8 @@ class Kassacompleetideal extends NonmerchantGateway
      */
     public function editSettings(array $meta)
     {
+        $that = $this;
+
         // Verify meta data is valid
         $rules = [
             'api_key' => [
@@ -67,6 +69,16 @@ class Kassacompleetideal extends NonmerchantGateway
                     'rule' => 'isEmpty',
                     'negate' => true,
                     'message' => Language::_('Kassacompleetideal.!error.api_key.empty', true)
+                ],
+                'valid' => [
+                    'rule' => function ($api_key) use ($that) {
+                        // Verify that we can make a successful request using the API
+                        $api = $that->getApi($api_key);
+                        $result = $api->getIssuers();
+
+                        return $result->errors() == '';
+                    },
+                    'message' => Language::_('Kassacompleetideal.!error.api_key.valid', true)
                 ]
             ]
         ];
@@ -151,7 +163,7 @@ class Kassacompleetideal extends NonmerchantGateway
             $api = $this->getApi($this->meta['api_key']);
 
             $params = [
-                'amount' => $amount * 100,
+                'amount' => $amount * 100, // Kassa Compleet processes values in cents
                 'currency' => $this->currency,
                 'description' => $options['description'],
                 'extra' => (object)[
@@ -170,7 +182,7 @@ class Kassacompleetideal extends NonmerchantGateway
             ];
 
 
-            // Log data sent for validation
+            // Log data sent for order creation
             $this->log(
                 'createorder',
                 json_encode($params, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT),
@@ -178,10 +190,10 @@ class Kassacompleetideal extends NonmerchantGateway
                 true
             );
 
-            // Get the url to redirect the client to
+            // Create an order in Kassa Compleet
             $result = $api->createOrder($params);
 
-            // Log post-back sent
+            // Log post-back sent (an order object on success)
             $this->log(
                 'createorder',
                 json_encode($result->response(), JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT),
@@ -196,9 +208,11 @@ class Kassacompleetideal extends NonmerchantGateway
 
             $data = $result->response();
 
+            // Get the url to redirect the client to
             $transaction = isset($data->transactions) ? $this->ifSet($data->transactions[0]) : null;
-            $kassacompleet_url = isset($transaction->payment_url) ? $transaction->payment_url : '';
+            $kassacompleet_url = $this->ifSet($transaction->payment_url);
 
+            // Redirect the use to Kassa Compleet to finish payment
             $this->redirectToUrl($kassacompleet_url);
         }
 
@@ -220,10 +234,12 @@ class Kassacompleetideal extends NonmerchantGateway
         // Load the Kassa Compleet API
         $api = $this->getApi($this->meta['api_key']);
 
+        // Get a list of issuers (banks) for the customer to choose from
         $issuer_ids = [];
         $result = $api->getIssuers();
         if ($result->errors() == '') {
             $issuers = $result->response();
+
             foreach ($issuers as $issuer) {
                 $issuer_ids[$issuer->id] = $issuer->name;
             }
@@ -257,7 +273,7 @@ class Kassacompleetideal extends NonmerchantGateway
     {
         // Load the Kassa Compleet API
         $api = $this->getApi($this->meta['api_key']);
-        $callback_data = json_decode(@file_get_contents("php://input"));
+        $callback_data = json_decode(@file_get_contents('php://input'));
 
         // Log request received
         $this->log(
@@ -273,12 +289,15 @@ class Kassacompleetideal extends NonmerchantGateway
         // Log data sent for validation
         $this->log(
             'validate',
-            json_encode(['order_id' => $this->ifSet($callback_data->order_id)], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT),
+            json_encode(
+                ['order_id' => $callback_data ? $this->ifSet($callback_data->order_id) : ''],
+                JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT
+            ),
             'input',
             true
         );
 
-        $result = $api->getOrder($this->ifSet($callback_data->order_id));
+        $result = $api->getOrder($callback_data ? $this->ifSet($callback_data->order_id) : '');
         $data = $result->response();
 
         // Log post-back sent
@@ -292,7 +311,7 @@ class Kassacompleetideal extends NonmerchantGateway
         // Get status from the order
         $status = $this->mapStatus($this->ifSet($data->status, 'error'));
         if ($status == 'see_transactions') {
-            // If necessary pul the status from the transactions
+            // If necessary pull the status from the transactions
             $status = $this->ifSet($data->transactions, []) ? 'approved' : 'error';
             $status_weights = $this->getStatusWeights();
 
@@ -308,7 +327,7 @@ class Kassacompleetideal extends NonmerchantGateway
 
         return [
             'client_id' => $this->ifSet($data->extra->client_id),
-            'amount' => $this->ifSet($data->amount, 0) / 100,
+            'amount' => $this->ifSet($data->amount, 0) / 100, // Kassa Compleet stores amounts in cents
             'currency' => $this->ifSet($data->currency),
             'status' => $status,
             'reference_id' => null,
@@ -318,12 +337,13 @@ class Kassacompleetideal extends NonmerchantGateway
     }
 
     /**
-     * Maps the statuses returned by Kassa Compleet to those in blesta
+     * Maps a status from by Kassa Compleet to one in blesta
      *
-     * @param string $status The Kassa Compleet status
+     * @param string $status The status from Kassa Compleet
      * @return string The Blesta status
      */
-    private function mapStatus($status) {
+    private function mapStatus($status)
+    {
         switch ($status) {
             case 'new':
             case 'processing':
@@ -345,9 +365,10 @@ class Kassacompleetideal extends NonmerchantGateway
     /**
      * Gets a list of blesta transaction statuses and weights by which to compare them
      *
-     * @return array A list of status weights
+     * @return array A list of statuses and their weights
      */
-    private function getStatusWeights() {
+    private function getStatusWeights()
+    {
         return [
             'error' => 0,
             'declined' => 20,
@@ -386,7 +407,7 @@ class Kassacompleetideal extends NonmerchantGateway
 
         return [
             'client_id' => $this->ifSet($data->extra->client_id),
-            'amount' => $this->ifSet($data->amount, 0) / 100,
+            'amount' => $this->ifSet($data->amount, 0) / 100, // Kassa Compleet stores amounts in cents
             'currency' => $this->ifSet($data->currency),
             'status' => 'approved', // we wouldn't be here if it weren't, right?
             'transaction_id' => $this->ifSet($data->id),
@@ -410,10 +431,8 @@ class Kassacompleetideal extends NonmerchantGateway
      */
     public function refund($reference_id, $transaction_id, $amount, $notes = null)
     {
-        // Force 2-decimal places only
-        $amount = (float)number_format($amount, 2, '.', '');
         $params = [
-            'amount' => $amount * 100,
+            'amount' => $amount * 100, // Kassa Compleet stores amounts in cents
             'description' => $notes
         ];
 
@@ -427,9 +446,11 @@ class Kassacompleetideal extends NonmerchantGateway
 
         // Load the Kassa Compleet API
         $api = $this->getApi($this->meta['api_key']);
+
+        // Refund the order
         $result = $api->refundOrder($transaction_id, $params);
 
-        // Log post-back sent
+        // Log post-back sent (a refund order on success)
         $this->log(
             'refundorder',
             json_encode($result->response(), JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT),
@@ -495,7 +516,7 @@ class Kassacompleetideal extends NonmerchantGateway
     /**
      * Initializes the Kassa Compleet API
      *
-     * @param string $api_key The webstore api key
+     * @param string $api_key The Kassa Compleet webshop API key
      * @return KassacompleetApi
      */
     private function getApi($api_key)

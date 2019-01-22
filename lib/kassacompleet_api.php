@@ -9,7 +9,7 @@ require_once dirname(__FILE__) . DIRECTORY_SEPARATOR . 'kassacompleet_response.p
 class KassaCompleetApi
 {
     /**
-     * @var string The Kassa Compleet API key
+     * @var string The Kassa Compleet webshop API key
      */
     private $api_key;
     /**
@@ -28,12 +28,12 @@ class KassaCompleetApi
     }
 
     /**
-     * Send a request to the KassaCompleet API.
+     * Sends a request to the Kassa Compleet API.
      *
      * @param string $method Specifies the endpoint and method to invoke
      * @param array $params The parameters to include in the api call
      * @param string $type The HTTP request type
-     * @return stdClass An object containing the api response
+     * @return KassacompleetResponse An object containing the api response
      */
     private function apiRequest($method, array $params = [], $type = 'GET')
     {
@@ -72,11 +72,9 @@ class KassaCompleetApi
 
         // Execute request
         curl_setopt($ch, CURLOPT_URL, $this->api_url . ltrim($method, '/'));
-        $data = '';
+        $data = curl_exec($ch);
         if (curl_errno($ch)) {
             $data = json_encode(['message' => curl_error($ch)]);
-        } else {
-            $data = curl_exec($ch);
         }
         curl_close($ch);
 
@@ -87,7 +85,6 @@ class KassaCompleetApi
      * Creates an order in Kassa Compleet using the given data
      *
      * @param array $data A list of data for creating the order including:
-     *  - merchant_order_id The order ID given by the merchant
      *  - amount The amount being charged on the order
      *  - currency The currency the order will charge in
      *  - description A description of the order
@@ -102,7 +99,7 @@ class KassaCompleetApi
     }
 
     /**
-     * Gets an order fron Kassa Compleet
+     * Gets an order from Kassa Compleet
      *
      * @param string $order_id The ID of the order in Kassa Compleet
      * @return KassacompleetResponse An object containing all the data sent back by Kassa Compleet
@@ -113,7 +110,7 @@ class KassaCompleetApi
     }
 
     /**
-     * Gets an order fron Kassa Compleet
+     * Refunds an order through Kassa Compleet
      *
      * @param string $order_id The ID of the order in Kassa Compleet
      * @param array $data A list of data for refunding the order including:

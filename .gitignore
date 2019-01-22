@@ -3,4 +3,4 @@
 
 # Ignore composer lock
 public_html/composer.lock
-/nbproject/private/
+/nbproject
