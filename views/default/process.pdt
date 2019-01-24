@@ -8,3 +8,17 @@
     $this->Form->fieldSubmit('submit_kassacompleet', $this->_('Kassacompleetideal.buildprocess.submit', true));
 
     $this->Form->end();
+    ?>
+<script type="text/javascript">
+    $(document).ready(function () {
+        $(".payment_buttons form").on('submit', preventSubmission);
+    });
+
+    function preventSubmission(e) {
+        e.stopPropagation();
+
+        $(this).clearQueue();
+        $(this).off('submit', preventSubmission);
+        return false;
+    }
+</script>
