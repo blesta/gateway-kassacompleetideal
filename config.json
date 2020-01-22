@@ -1,7 +1,7 @@
 {
-	"version": "1.0.1",
+	"version": "1.1.0",
 	"name": "Kassacompleetideal.name",
-	"description": "Kassa Compleet integration using the iDeal payment type",
+	"description": "Kassacompleetideal.description",
 	"authors": [
 		{
 			"name": "Phillips Data, Inc.",
