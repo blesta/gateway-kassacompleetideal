@@ -176,7 +176,7 @@ class Kassacompleetideal extends NonmerchantGateway
                 'transactions' => [
                     (object)[
                         'payment_method' => 'ideal',
-                        'payment_method_details' => (object)['issuer_id' => $this->ifSet($_POST['issuer_id'])]
+                        'payment_method_details' => (object)['issuer_id' => (isset($_POST['issuer_id']) ? $_POST['issuer_id'] : null)]
                     ]
                 ]
             ];
@@ -209,8 +209,8 @@ class Kassacompleetideal extends NonmerchantGateway
             $data = $result->response();
 
             // Get the url to redirect the client to
-            $transaction = isset($data->transactions) ? $this->ifSet($data->transactions[0]) : null;
-            $kassacompleet_url = $this->ifSet($transaction->payment_url);
+            $transaction = isset($data->transactions) ? (isset($data->transactions[0]) ? $data->transactions[0] : null) : null;
+            $kassacompleet_url = (isset($transaction->payment_url) ? $transaction->payment_url : null);
 
             // Redirect the use to Kassa Compleet to finish payment
             $this->redirectToUrl($kassacompleet_url);
@@ -277,7 +277,7 @@ class Kassacompleetideal extends NonmerchantGateway
 
         // Log request received
         $this->log(
-            $this->ifSet($_SERVER['REQUEST_URI']),
+            (isset($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI'] : null),
             json_encode(
                 $callback_data,
                 JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT
@@ -290,14 +290,14 @@ class Kassacompleetideal extends NonmerchantGateway
         $this->log(
             'validate',
             json_encode(
-                ['order_id' => $callback_data ? $this->ifSet($callback_data->order_id) : ''],
+                ['order_id' => $callback_data ? (isset($callback_data->order_id) ? $callback_data->order_id : null) : ''],
                 JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT
             ),
             'input',
             true
         );
 
-        $result = $api->getOrder($callback_data ? $this->ifSet($callback_data->order_id) : '');
+        $result = $api->getOrder($callback_data ? (isset($callback_data->order_id) ? $callback_data->order_id : null) : '');
         $data = $result->response();
 
         // Log post-back sent
@@ -309,16 +309,16 @@ class Kassacompleetideal extends NonmerchantGateway
         );
 
         // Get status from the order
-        $status = $this->mapStatus($this->ifSet($data->status, 'error'));
+        $status = $this->mapStatus((isset($data->status) ? $data->status : 'error'));
         if ($status == 'see_transactions') {
             // If necessary pull the status from the transactions
-            $status = $this->ifSet($data->transactions, []) ? 'approved' : 'error';
+            $status = (isset($data->transactions) ? $data->transactions : []) ? 'approved' : 'error';
             $status_weights = $this->getStatusWeights();
 
             // Use the lowest value status among the transactions
-            foreach ($this->ifSet($data->transactions, []) as $transaction) {
+            foreach ((isset($data->transactions) ? $data->transactions : []) as $transaction) {
                 $transaction_status = $this->mapStatus($transaction->status);
-                if ($this->ifSet($status_weights[$transaction_status], 100) < $status_weights[$status]) {
+                if ((isset($status_weights[$transaction_status]) ? $status_weights[$transaction_status] : 100) < $status_weights[$status]) {
                     $status = $transaction_status;
                 }
             }
@@ -326,13 +326,13 @@ class Kassacompleetideal extends NonmerchantGateway
 
 
         return [
-            'client_id' => $this->ifSet($data->extra->client_id),
-            'amount' => $this->ifSet($data->amount, 0) / 100, // Kassa Compleet stores amounts in cents
-            'currency' => $this->ifSet($data->currency),
+            'client_id' => (isset($data->extra->client_id) ? $data->extra->client_id : null),
+            'amount' => (isset($data->amount) ? $data->amount : 0) / 100, // Kassa Compleet stores amounts in cents
+            'currency' => (isset($data->currency) ? $data->currency : null),
             'status' => $status,
             'reference_id' => null,
-            'transaction_id' => $this->ifSet($data->id),
-            'invoices' => $this->unserializeInvoices($this->ifSet($data->extra->invoices))
+            'transaction_id' => (isset($data->id) ? $data->id : null),
+            'invoices' => $this->unserializeInvoices((isset($data->extra->invoices) ? $data->extra->invoices : null))
         ];
     }
 
@@ -402,16 +402,16 @@ class Kassacompleetideal extends NonmerchantGateway
         $api = $this->getApi($this->meta['api_key']);
 
         // Get transaction data
-        $result = $api->getOrder($this->ifSet($get['order_id']));
+        $result = $api->getOrder((isset($get['order_id']) ? $get['order_id'] : null));
         $data = $result->response();
 
         return [
-            'client_id' => $this->ifSet($data->extra->client_id),
-            'amount' => $this->ifSet($data->amount, 0) / 100, // Kassa Compleet stores amounts in cents
-            'currency' => $this->ifSet($data->currency),
+            'client_id' => (isset($data->extra->client_id) ? $data->extra->client_id : null),
+            'amount' => (isset($data->amount) ? $data->amount : 0) / 100, // Kassa Compleet stores amounts in cents
+            'currency' => (isset($data->currency) ? $data->currency : null),
             'status' => 'approved', // we wouldn't be here if it weren't, right?
-            'transaction_id' => $this->ifSet($data->id),
-            'invoices' => $this->unserializeInvoices($this->ifSet($data->extra->invoices))
+            'transaction_id' => (isset($data->id) ? $data->id : null),
+            'invoices' => $this->unserializeInvoices((isset($data->extra->invoices) ? $data->extra->invoices : null))
         ];
     }
 
